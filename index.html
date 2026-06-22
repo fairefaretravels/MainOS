@@ -68,7 +68,7 @@
     <div class="box" id="roleBadge">ROLE</div>
     <div class="box" id="stateBox">Broadcast: --</div>
     <div class="box" id="djBox">Mode: --</div>
-
+    <div class="box" id="debugBox">DEBUG: waiting...</div>
     <button onclick="setBroadcast('ON AIR')">ON AIR</button>
     <button onclick="setBroadcast('OFF AIR')">OFF AIR</button>
 
@@ -173,6 +173,9 @@ function render() {
 
   document.getElementById("roleBadge").innerText =
     "Role: " + state.role;
+
+  document.getElementById("debugBox").innerText =
+    "SYNC: " + JSON.stringify(state);
 }
 
 /* --------------------------
