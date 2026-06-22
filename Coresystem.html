@@ -1,0 +1,18 @@
+        ┌────────────────────────────┐
+        │   SENSTACK OS FRONTEND     │
+        │ (GitHub Pages Dashboard)   │
+        └────────────┬───────────────┘
+                     │  realtime subscribe / update
+                     ▼
+        ┌────────────────────────────┐
+        │        SUPABASE DB         │
+        │  system_state table        │
+        │  system_logs table         │
+        └────────────┬───────────────┘
+                     │
+          realtime broadcast events
+                     ▼
+        ┌────────────────────────────┐
+        │ ALL CONNECTED DEVICES      │
+        │ DJ / Admin / Guest screens │
+        └────────────────────────────┘
