@@ -162,117 +162,135 @@ button.ctrl {
 </div>
 
 <script>
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
 
-/* =========================
-   STATE ENGINE
-========================= */
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let state = {
-  role: "GUEST",
   broadcast: "STANDBY",
-  dj: "AUTO DJ",
-  log: []
+  dj_mode: "AUTO DJ",
+  role: "GUEST"
 };
 
-function saveState() {
-  localStorage.setItem("SENSTACK_OS", JSON.stringify(state));
+/* --------------------------
+   LOAD INITIAL STATE
+-------------------------- */
+
+async function loadState() {
+  let { data } = await sb
+    .from("system_state")
+    .select("*")
+    .eq("id", "global")
+    .single();
+
+  if (data) {
+    state = {
+      broadcast: data.broadcast,
+      dj_mode: data.dj_mode,
+      role: data.role
+    };
+  }
+
+  render();
 }
 
-function loadState() {
-  const saved = localStorage.getItem("SENSTACK_OS");
-  if (saved) state = JSON.parse(saved);
+/* --------------------------
+   UPDATE STATE (WRITE)
+-------------------------- */
+
+async function updateState(partial) {
+  state = { ...state, ...partial };
+
+  await sb
+    .from("system_state")
+    .update({
+      broadcast: state.broadcast,
+      dj_mode: state.dj_mode,
+      role: state.role,
+      updated_at: new Date()
+    })
+    .eq("id", "global");
+
+  await sb.from("system_logs").insert({
+    message: JSON.stringify(partial)
+  });
 }
 
-/* =========================
-   INIT
-========================= */
+/* --------------------------
+   REAL-TIME LISTENER
+-------------------------- */
 
-loadState();
+sb
+  .channel("system-realtime")
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "system_state"
+    },
+    (payload) => {
+      const newData = payload.new;
 
-/* =========================
-   LOGIN
-========================= */
+      state.broadcast = newData.broadcast;
+      state.dj_mode = newData.dj_mode;
+      state.role = newData.role;
+
+      render();
+  })
+  .subscribe();
+
+/* --------------------------
+   ACTIONS
+-------------------------- */
+
+function setState(val) {
+  updateState({ broadcast: val });
+}
+
+function setDJ(val) {
+  updateState({ dj_mode: val });
+}
+
+/* --------------------------
+   LOGIN (simple role gate)
+-------------------------- */
 
 function login() {
   const pin = document.getElementById("pin").value;
 
-  if (pin === "DJ404") state.role = "DJ";
-  else if (pin === "ADMIN999") state.role = "ADMIN";
-  else state.role = "GUEST";
+  let role = "GUEST";
+  if (pin === "DJ404") role = "DJ";
+  if (pin === "ADMIN999") role = "ADMIN";
 
+  updateState({ role });
   document.getElementById("login").style.display = "none";
   document.getElementById("app").style.display = "block";
 
-  render();
-  log("LOGIN → " + state.role);
-  saveState();
+  loadState();
 }
 
-/* =========================
-   ACTIONS
-========================= */
-
-function setState(s) {
-  state.broadcast = s;
-  log("BROADCAST → " + s);
-  render();
-  saveState();
-}
-
-function setDJ(m) {
-  state.dj = m;
-  log("DJ MODE → " + m);
-  render();
-  saveState();
-}
-
-/* =========================
-   LOG SYSTEM
-========================= */
-
-function log(msg) {
-  const entry = new Date().toLocaleTimeString() + " — " + msg;
-  state.log.unshift(entry);
-  if (state.log.length > 20) state.log.pop();
-}
-
-/* =========================
-   RENDER SYSTEM
-========================= */
+/* --------------------------
+   RENDER UI
+-------------------------- */
 
 function render() {
-  document.getElementById("roleBadge").innerText = state.role;
-
   document.getElementById("stateBox").innerText =
     "Broadcast: " + state.broadcast;
 
   document.getElementById("djBox").innerText =
-    "Mode: " + state.dj;
+    "Mode: " + state.dj_mode;
 
-  document.getElementById("logBox").innerHTML =
-    state.log.map(l => "• " + l).join("<br>");
+  document.getElementById("roleBadge").innerText =
+    state.role;
 }
 
-/* =========================
-   CLEAR LOG
-========================= */
+/* --------------------------
+   INIT
+-------------------------- */
 
-function clearLog() {
-  state.log = [];
-  saveState();
-  render();
-}
-
-/* =========================
-   AUTO RESTORE
-========================= */
-
-if (localStorage.getItem("SENSTACK_OS")) {
-  document.getElementById("login").style.display = "none";
-  document.getElementById("app").style.display = "block";
-  render();
-}
-
+loadState();
 </script>
 
 </body>
