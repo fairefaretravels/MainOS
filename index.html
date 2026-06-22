@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SENSTACK Broadcast OS</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0d0d0d;
+      color: #f0ede6;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .panel {
+      width: 90%;
+      max-width: 500px;
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .box {
+      background: #2a2a2a;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+    }
+
+    .error-box {
+      background: #3a1a1a;
+      color: #ff6b6b;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #c8963e;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      border-radius: 6px;
+      color: #0d0d0d;
+    }
+
+    button:hover {
+      background: #e0aa50;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #f0ede6;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="panel">
+
+  <h2>SENSTACK OS</h2>
+
+  <div id="login">
+    <input id="pin" placeholder="Enter Access PIN" type="password"/>
+    <button onclick="login()">ENTER</button>
+  </div>
+
+  <div id="app" style="display:none;">
+
+    <div class="box" id="roleBadge">ROLE</div>
+    <div class="box" id="stateBox">Broadcast: --</div>
+    <div class="box" id="djBox">Mode: --</div>
+    <div class="box" id="debugBox">DEBUG: waiting...</div>
+    <div class="error-box" id="errorBox"></div>
+
+    <button onclick="setBroadcast('ON AIR')">ON AIR</button>
+    <button onclick="setBroadcast('OFF AIR')">OFF AIR</button>
+
+    <button onclick="setDJ('AUTO DJ')">AUTO DJ</button>
+    <button onclick="setDJ('LIVE DJ')">LIVE DJ</button>
+
+  </div>
+
+</div>
+
+<script>
+/* --------------------------
+   SUPABASE CONFIG
+-------------------------- */
+const SUPABASE_URL = "https://adfwupnskpyujrvcagso.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZnd1cG5za3B5dWpydmNhZ3NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzc2MTUsImV4cCI6MjA5NzcxMzYxNX0.3Qs-qMMSSmFxjeUMiOYjrXUGXV5ZNZGOP4alfWjaPtE";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* --------------------------
+   STATE
+   NOTE: role lives locally only — never pulled from DB
+-------------------------- */
+let state = {
+  broadcast: "STANDBY",
+  dj_mode: "AUTO DJ",
+  role: "GUEST"
+};
+
+/* --------------------------
+   LOGIN (simple PIN roles)
+-------------------------- */
+function login() {
+  const pin = document.getElementById("pin").value.trim();
+
+  let role = "GUEST";
+  if (pin === "DJ404")    role = "DJ";
+  if (pin === "ADMIN999") role = "ADMIN";
+
+  state.role = role;
+
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  render();
+  fetchState(); // pull current broadcast/dj_mode immediately on login
+}
+
+/* --------------------------
+   SHOW / HIDE ERROR
+-------------------------- */
+function showError(msg) {
+  const box = document.getElementById("errorBox");
+  box.style.display = "block";
+  box.innerText = "ERROR: " + msg;
+}
+
+function clearError() {
+  const box = document.getElementById("errorBox");
+  box.style.display = "none";
+  box.innerText = "";
+}
+
+/* --------------------------
+   FETCH STATE
+   FIX: role is NOT pulled from DB — only broadcast + dj_mode sync
+-------------------------- */
+async function fetchState() {
+  const { data, error } = await sb
+    .from('system_state')
+    .select('broadcast, dj_mode')   // ← role excluded intentionally
+    .eq('id', 'global')
+    .single();
+
+  if (error) {
+    showError(error.message || "Could not reach system_state table");
+    document.getElementById("debugBox").innerText = "SYNC FAILED: " + error.message;
+    return;
+  }
+
+  if (!data) {
+    showError("No state row found — insert a row with id='global' in Supabase.");
+    document.getElementById("debugBox").innerText = "SYNC: no data returned";
+    return;
+  }
+
+  clearError();
+  // FIX: only update broadcast + dj_mode, preserve local role
+  state.broadcast = data.broadcast;
+  state.dj_mode   = data.dj_mode;
+  render();
+}
+
+/* --------------------------
+   UPDATE STATE
+   FIX: role is NOT written to DB
+-------------------------- */
+async function updateState(partial) {
+  state = { ...state, ...partial };
+
+  const { error } = await sb
+    .from('system_state')
+    .update({
+      broadcast:  state.broadcast,
+      dj_mode:    state.dj_mode,
+      // role excluded intentionally
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', 'global');
+
+  if (error) {
+    showError("Update failed: " + error.message);
+  } else {
+    clearError();
+  }
+
+  render();
+}
+
+/* --------------------------
+   ACTIONS
+-------------------------- */
+function setBroadcast(val) { updateState({ broadcast: val }); }
+function setDJ(val)        { updateState({ dj_mode: val }); }
+
+/* --------------------------
+   RENDER UI
+-------------------------- */
+function render() {
+  document.getElementById("stateBox").innerText  = "Broadcast: " + state.broadcast;
+  document.getElementById("djBox").innerText     = "Mode: "      + state.dj_mode;
+  document.getElementById("roleBadge").innerText = "Role: "      + state.role;
+  document.getElementById("debugBox").innerText  = "SYNC: "      + JSON.stringify({
+    broadcast: state.broadcast,
+    dj_mode:   state.dj_mode,
+    role:      state.role
+  });
+}
+
+/* --------------------------
+   POLLING LOOP (1.5s)
+   Only runs after login
+-------------------------- */
+let pollInterval = null;
+
+function startPolling() {
+  if (pollInterval) return;
+  pollInterval = setInterval(() => {
+    if (document.getElementById("app").style.display !== "none") {
+      fetchState().catch(err => console.log("POLL ERROR:", err));
+    }
+  }, 1500);
+}
+
+/* --------------------------
+   INIT — start polling immediately
+   (fetchState is safe before login; it just won't render)
+-------------------------- */
+startPolling();
+</script>
+
+</body>
+</html>
