@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SENSTACK Broadcast OS</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0d0d0d;
+      color: #f0ede6;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .panel {
+      width: 90%;
+      max-width: 500px;
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .box {
+      background: #2a2a2a;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #c8963e;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="panel">
+
+  <h2>SENSTACK OS</h2>
+
+  <div id="login">
+    <input id="pin" placeholder="Enter Access PIN"/>
+    <button onclick="login()">ENTER</button>
+  </div>
+
+  <div id="app" style="display:none;">
+
+    <div class="box" id="roleBadge">ROLE</div>
+    <div class="box" id="stateBox">Broadcast: --</div>
+    <div class="box" id="djBox">Mode: --</div>
+
+    <button onclick="setBroadcast('ON AIR')">ON AIR</button>
+    <button onclick="setBroadcast('OFF AIR')">OFF AIR</button>
+
+    <button onclick="setDJ('AUTO DJ')">AUTO DJ</button>
+    <button onclick="setDJ('LIVE DJ')">LIVE DJ</button>
+
+  </div>
+
+</div>
+
+<script>
+/* --------------------------
+   SUPABASE CONFIG
+-------------------------- */
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* --------------------------
+   STATE
+-------------------------- */
+let state = {
+  broadcast: "STANDBY",
+  dj_mode: "AUTO DJ",
+  role: "GUEST"
+};
+
+/* --------------------------
+   LOGIN (simple PIN roles)
+-------------------------- */
+function login() {
+  const pin = document.getElementById("pin").value;
+
+  let role = "GUEST";
+  if (pin === "DJ404") role = "DJ";
+  if (pin === "ADMIN999") role = "ADMIN";
+
+  state.role = role;
+
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  render();
+}
+
+/* --------------------------
+   FETCH STATE
+-------------------------- */
+async function fetchState() {
+  const { data } = await sb
+    .from('system_state')
+    .select('*')
+    .eq('id', 'global')
+    .single();
+
+  if (data) {
+    state.broadcast = data.broadcast;
+    state.dj_mode = data.dj_mode;
+    state.role = data.role;
+    render();
+  }
+}
+
+/* --------------------------
+   UPDATE STATE
+-------------------------- */
+async function updateState(partial) {
+  state = { ...state, ...partial };
+
+  await sb
+    .from('system_state')
+    .update({
+      broadcast: state.broadcast,
+      dj_mode: state.dj_mode,
+      role: state.role,
+      updated_at: new Date()
+    })
+    .eq('id', 'global');
+}
+
+/* --------------------------
+   ACTIONS
+-------------------------- */
+function setBroadcast(val) {
+  updateState({ broadcast: val });
+}
+
+function setDJ(val) {
+  updateState({ dj_mode: val });
+}
+
+/* --------------------------
+   RENDER UI
+-------------------------- */
+function render() {
+  document.getElementById("stateBox").innerText =
+    "Broadcast: " + state.broadcast;
+
+  document.getElementById("djBox").innerText =
+    "Mode: " + state.dj_mode;
+
+  document.getElementById("roleBadge").innerText =
+    "Role: " + state.role;
+}
+
+/* --------------------------
+   POLLING LOOP (FREE REALTIME)
+-------------------------- */
+setInterval(fetchState, 1500);
+
+/* --------------------------
+   INIT
+-------------------------- */
+fetchState();
+</script>
+
+</body>
+</html>
