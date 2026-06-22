@@ -136,14 +136,15 @@ async function fetchState() {
    UPDATE STATE
 -------------------------- */
 async function updateState(partial) {
-  state = { ...state, ...partial };
+  const newState = { ...state, ...partial };
+  state = newState;
 
   await sb
     .from('system_state')
     .update({
-      broadcast: state.broadcast,
-      dj_mode: state.dj_mode,
-      role: state.role,
+      broadcast: newState.broadcast,
+      dj_mode: newState.dj_mode,
+      role: newState.role,
       updated_at: new Date()
     })
     .eq('id', 'global');
@@ -177,7 +178,9 @@ function render() {
 /* --------------------------
    POLLING LOOP (FREE REALTIME)
 -------------------------- */
-setInterval(fetchState, 1500);
+setInterval(() => {
+  fetchState().catch(err => console.log("SYNC ERROR:", err));
+}, 1500);
 
 /* --------------------------
    INIT
