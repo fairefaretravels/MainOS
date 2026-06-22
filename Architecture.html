@@ -1,17 +1,35 @@
-           ┌──────────────────────────────┐
-           │   SENSTACK OS FRONTEND       │
-           │ (GitHub Pages / Dashboard)   │
-           └─────────────┬────────────────┘
-                         │
-                 REAL-TIME STATE
-                         │
-        ┌────────────────┴────────────────┐
-        │                                 │
-┌───────────────┐               ┌────────────────┐
-│  SUPABASE DB  │               │ LIVE SUBSCRIPT │
-│ (single truth)│◄─────────────►│ (realtime sync)│
-└───────────────┘               └────────────────┘
-        │
-        ▼
- ALL DEVICES UPDATE INSTANTLY
- (DJ, Admin, Guests, Phones, Tablets)
+                 Broadcast OS
+
+                      │
+                      ▼
+
+              Global State
+                 Supabase
+
+                      │
+ ┌────────────┬─────────────┬─────────────┐
+ ▼            ▼             ▼             ▼
+
+STV Radio   Interview     AI Radio    WS-GTOL
+
+                      │
+                      ▼
+
+                Operator Panel
+
+                      │
+      ┌───────────────┼───────────────┐
+      ▼               ▼               ▼
+
+     Host            DJ           Producer
+
+                      │
+                      ▼
+
+                Public Players
+
+                      │
+      ┌───────────────┼───────────────┐
+      ▼               ▼               ▼
+
+ Red Player      Gold Player      Night Player
